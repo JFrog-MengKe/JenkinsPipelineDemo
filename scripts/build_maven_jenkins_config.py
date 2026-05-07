@@ -23,7 +23,7 @@ params_block = "\n".join(
     [
         param(
             "JFROG_SERVER_ID",
-            "soleng",
+            "my-platform",
             "JFrog Platform Server ID from Jenkins system config.",
         ),
         param(
@@ -33,22 +33,22 @@ params_block = "\n".join(
         ),
         param(
             "RESOLVE_RELEASES",
-            "mk-libs-release",
+            "libs-release",
             "Maven repo key for resolving releases (Artifactory virtual).",
         ),
         param(
             "RESOLVE_SNAPSHOTS",
-            "mk-libs-snapshot",
+            "libs-snapshot",
             "Maven repo key for resolving snapshots.",
         ),
         param(
             "DEPLOY_RELEASES",
-            "mk-libs-release-local",
+            "libs-release-local",
             "Maven local repo for deploying releases.",
         ),
         param(
             "DEPLOY_SNAPSHOTS",
-            "mk-libs-snapshot-local",
+            "libs-snapshot-local",
             "Maven local repo for deploying snapshots.",
         ),
         param(

@@ -23,7 +23,7 @@ params_block = "\n".join(
     [
         param(
             "JFROG_SERVER_ID",
-            "soleng",
+            "my-platform",
             "JFrog Platform Server ID (Jenkins → JFrog configuration).",
         ),
         param(
@@ -33,12 +33,12 @@ params_block = "\n".join(
         ),
         param(
             "NPM_REPO_RESOLVE",
-            "mk-npm-virtual",
+            "npm-virtual",
             "Virtual (or remote) npm repository for dependency resolution.",
         ),
         param(
             "NPM_REPO_DEPLOY",
-            "mk-npm-local",
+            "npm-local",
             "Local npm repository for publishing the tarball.",
         ),
         param(

@@ -15,7 +15,7 @@ node {
             env.JFROG_BUILD_NUMBER = jfrogBuildNumber
 
             stage('Checkout') {
-                git 'https://github.com/JFrog-MengKe/project-examples'
+                git 'https://github.com/jfrog/project-examples'
             }
 
             stage('JFrog npm (install + record deps)') {
