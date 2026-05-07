@@ -1,0 +1,63 @@
+// Scripted Pipeline: JFrog CLI + Maven + Build Info (matches job project-examples-maven-jfrog)
+// Requires: Pipeline, Git, JFrog Jenkins Plugin (jf step + jfrog-cli tool), JDK 8 on agent
+node {
+    timestamps {
+        try {
+            env.CI = 'true'
+            env.JFROG_CLI_AVOID_NEW_VERSION_WARNING = 'true'
+            env.JFROG_CLI_HIDE_SURVEY = 'true'
+            env.JFROG_CLI_SERVER_ID = params.JFROG_SERVER_ID
+            env.JFROG_BINARY_PATH = tool 'jfrog-cli'
+
+            def jfrogBuildName = (params.JFROG_BUILD_NAME?.trim() ?: env.JOB_BASE_NAME)
+            def jfrogBuildNumber = env.BUILD_NUMBER
+            env.JFROG_BUILD_NAME = jfrogBuildName
+            env.JFROG_BUILD_NUMBER = jfrogBuildNumber
+
+            stage('Checkout') {
+                git 'https://github.com/JFrog-MengKe/project-examples'
+            }
+
+            stage('JFrog Maven (BuildInfo via CLI)') {
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+                    'PATH+JDK8=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                ]) {
+                    dir('maven-examples/maven-example') {
+                        jf([
+                            'mvn-config',
+                            '--server-id-resolve', params.JFROG_SERVER_ID,
+                            '--server-id-deploy', params.JFROG_SERVER_ID,
+                            '--repo-resolve-releases', params.RESOLVE_RELEASES,
+                            '--repo-resolve-snapshots', params.RESOLVE_SNAPSHOTS,
+                            '--repo-deploy-releases', params.DEPLOY_RELEASES,
+                            '--repo-deploy-snapshots', params.DEPLOY_SNAPSHOTS,
+                            '--use-wrapper'
+                        ])
+                        jf(['mvn'] + params.MVN_GOALS.trim().split(/\s+/).findAll { it } as List)
+                    }
+                }
+            }
+
+            stage('Enrich build info (env + git)') {
+                jf(['rt', 'build-collect-env', jfrogBuildName, jfrogBuildNumber])
+                jf(['rt', 'build-add-git', jfrogBuildName, jfrogBuildNumber])
+            }
+
+            stage('Publish build info') {
+                jf(['rt', 'build-publish', jfrogBuildName, jfrogBuildNumber])
+            }
+            stage('Security Check') {
+                jf 'bs'
+            }
+        } finally {
+            stage('Cleanup Maven local repository') {
+                sh '''set +e
+echo "Cleaning Maven local repository at: $HOME/.m2/repository"
+rm -rf "$HOME/.m2/repository" || true
+mkdir -p "$HOME/.m2/repository" || true
+'''
+            }
+        }
+    }
+}

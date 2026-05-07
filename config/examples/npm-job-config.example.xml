@@ -1,0 +1,110 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions/>
+  <description>project-examples npm-example: jf npm-config, install, publish, Build Info (env/git), rt build-publish.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>JFROG_SERVER_ID</name>
+          <description>JFrog Platform Server ID (Jenkins → JFrog configuration).</description>
+          <defaultValue>soleng</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>JFROG_BUILD_NAME</name>
+          <description>Artifactory build-info name. Empty = job short name (JOB_BASE_NAME).</description>
+          <defaultValue></defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NPM_REPO_RESOLVE</name>
+          <description>Virtual (or remote) npm repository for dependency resolution.</description>
+          <defaultValue>mk-npm-virtual</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NPM_REPO_DEPLOY</name>
+          <description>Local npm repository for publishing the tarball.</description>
+          <defaultValue>mk-npm-local</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NPM_INSTALL_ARGS</name>
+          <description>Extra args to pass to npm install only (space-separated), e.g. --omit=dev</description>
+          <defaultValue></defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4285.v8df38f05c3c5">
+    <script><![CDATA[// Scripted Pipeline: JFrog CLI + npm + Build Info (matches job project-examples-npm-jfrog)
+// Requires: Pipeline, Git, JFrog Jenkins Plugin, Node.js + npm on agent
+node {
+    timestamps {
+        try {
+            env.CI = 'true'
+            env.JFROG_CLI_AVOID_NEW_VERSION_WARNING = 'true'
+            env.JFROG_CLI_HIDE_SURVEY = 'true'
+            env.JFROG_CLI_SERVER_ID = params.JFROG_SERVER_ID
+            env.JFROG_BINARY_PATH = tool 'jfrog-cli'
+
+            def jfrogBuildName = (params.JFROG_BUILD_NAME?.trim() ?: env.JOB_BASE_NAME)
+            def jfrogBuildNumber = env.BUILD_NUMBER
+            env.JFROG_BUILD_NAME = jfrogBuildName
+            env.JFROG_BUILD_NUMBER = jfrogBuildNumber
+
+            stage('Checkout') {
+                git 'https://github.com/JFrog-MengKe/project-examples'
+            }
+
+            stage('JFrog npm (install + record deps)') {
+                dir('npm-example') {
+                    jf([
+                        'npm-config',
+                        '--server-id-resolve', params.JFROG_SERVER_ID,
+                        '--server-id-deploy', params.JFROG_SERVER_ID,
+                        '--repo-resolve', params.NPM_REPO_RESOLVE,
+                        '--repo-deploy', params.NPM_REPO_DEPLOY
+                    ])
+                    def installArgs = params.NPM_INSTALL_ARGS?.trim() ? params.NPM_INSTALL_ARGS.trim().split(/\s+/).findAll { it } as List : []
+                    jf(['npm', 'install'] + installArgs + ['--build-name', jfrogBuildName, '--build-number', jfrogBuildNumber])
+                }
+            }
+
+            stage('Enrich build info (env + git)') {
+                jf(['rt', 'build-collect-env', jfrogBuildName, jfrogBuildNumber])
+                jf(['rt', 'build-add-git', jfrogBuildName, jfrogBuildNumber])
+            }
+
+            stage('Publish npm package') {
+                dir('npm-example') {
+                    jf(['npm', 'publish', '--build-name', jfrogBuildName, '--build-number', jfrogBuildNumber])
+                }
+            }
+
+            stage('Publish build info') {
+                jf(['rt', 'build-publish', jfrogBuildName, jfrogBuildNumber])
+            }
+
+            stage('Security Check') {
+                jf 'bs'
+            }
+        } finally {
+            stage('Cleanup npm workspace') {
+                sh '''set +e
+echo "Removing npm-example/node_modules"
+rm -rf "${WORKSPACE}/npm-example/node_modules" || true
+'''
+            }
+        }
+    }
+}
+]]></script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

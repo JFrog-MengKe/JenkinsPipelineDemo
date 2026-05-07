@@ -1,0 +1,4 @@
+.DS_Store
+*.bak
+*.swp
+config/examples/*-generated.xml
